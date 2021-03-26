@@ -4,6 +4,43 @@
 const { createReadStream, createWriteStream } = require('fs');
 const { createInterface } = require('readline');
 
+/**
+ *
+ * Arithmetic/Logic commands
+ * add | x+y     | integer
+ * sub | x-y     | integer
+ * neg | -y      | integer
+ * eq  | x == 0  | boolean
+ * gt  | x > y   | boolean
+ * lt  | x < y   | boolean
+ * and | x AND y | boolean
+ * or  | x OR y  | boolean
+ * not | NOT x   | boolean
+ *
+ *
+ * Segments
+ * local
+ * argument
+ * this
+ * that
+ * constant
+ * static
+ * pointer
+ * temp
+ *
+ * Pointers
+ * &ptr (address of pointer variable itself)
+ * ptr = <addr> (Memory[&ptr] holds some address)
+ * *ptr = Memory[addr]
+ *
+ * push segment i
+ * addr = segmentPointer + i; *SP = *addr; SP++
+ *
+ * pop segment i
+ * addr = segmentPointer + i; SP--; *addr = *SP
+ *
+ */
+
 // @todo...
 function translate(input) {
     const result = [];
