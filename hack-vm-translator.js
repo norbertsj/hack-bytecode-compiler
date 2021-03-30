@@ -17,7 +17,6 @@ const { createInterface } = require('readline');
  * or  | x OR y  | boolean
  * not | NOT x   | boolean
  *
- *
  * Segments
  * local
  * argument
@@ -34,29 +33,18 @@ const { createInterface } = require('readline');
  * ARG  2 argument segment
  * THIS 3 this segment
  * THAT 4 that segment
- * temp 5 temp segment start
- * temp 6
- * temp 7
- * temp 8
- * temp 9
- * temp 10
- * temp 11
- * temp 12 temp segment end
+ * temp 5..12
+ * static 16..255 (these are just Hack ASM variables)
  * 
  * pointer is either 0/1 (points to THIS or THAT segment base address)
  * THAT = 0
  * THIS = 1
  *
- * Pointers
- * ptr = <addr>
+ * Pointers in general
+ * ptr  = <addr>
+ * &ptr = Memory[<ptr>]
  * *ptr = Memory[<addr>]
  * 
- * push pointer 0/1
- * *SP = THIS/THAT; SP++
- * 
- * pop pointer 0/1
- * SP--; THIS/THAT = *SP 
- *
  * push segment i
  * addr = segmentPointer + i; *SP = *addr; SP++
  *
@@ -66,52 +54,98 @@ const { createInterface } = require('readline');
  * push constant i
  * *SP = i; SP++
  * 
- * Static
- * ? 
+ * push pointer 0/1
+ * *SP = THIS/THAT; SP++
  * 
+ * pop pointer 0/1
+ * SP--; THIS/THAT = *SP 
  *
- */
-
-/**
- * Lets try writing Hack assembly here to see how to actually implement
- * push local 7
- * // addr = segmentPointer + i
- * @7       // A=i
- * D=A      // D=i
- * @LCL     // A=LCL
- * A=D+A    // A=i+LCL
+ * Static
+ * Static vars translate to Hack ASM variables
+ * In file <filename>.vm static vars translate to Hack ASM vars with name <filename>.<i>
  * 
- * // *SP = *addr
- * D=M      // D=M[LCL+i] getting the value from local segment
- * @SP      // A=SP
- * A=M      // A=&M[SP]
- * M=D      // M[SP]=M[LCL+i] storing the value from local segment into the stack
+ * 
+ * Lets try writing Hack assembly here to see how to actually implement
+ * 
+ * // addr = segmentPointer + i
+ * @<i>
+ * D=A
+ * @<segmentPointer(LCL|ARG|THIS|THAT|5(temp))>
+ * A=D+A
+ * 
+ * // *SP = *addr (presume: A=addr; M=*addr)
+ * D=M
+ * @SP
+ * A=M
+ * M=D
+ * 
+ * // *addr = *SP (presume: A=&SP; M=SP; D=addr)
+ * @R15
+ * M=D // save the addr in R15
+ * @SP
+ * A=M
+ * D=M // D = *SP
+ * @R15
+ * A=M
+ * M=D // and finally *addr = *SP
  * 
  * // SP++
  * @SP 
  * M=M+1
  * 
+ * // SP--
+ * @SP
+ * M=M-1
  * 
+ * // push segment i
+ * (addr = segmentPointer + i)
+ * (*SP = *addr) 
+ * (SP++)
  * 
- * push argument 1
- * push this 1
- * push that 1
- * push constant 1
- * push static 1
- * push pointer 0
- * push pointer 1
- * push temp 1
+ * // pop segment i
+ * (addr = segmentPointer + i)
+ * D=A
+ * (SP--)
+ * (*addr = *SP)
+ * 
+ * // push constant <CONST>
+ * @<CONST>
+ * D=A
+ * @SP
+ * A=M
+ * M=D
+ * (SP++)
+ * 
+ * // push pointer <0|1>
+ * @<THIS|THAT>
+ * D=M
+ * @SP
+ * A=M
+ * M=D
+ * (SP++)
+ * 
+ * // pop pointer <0|1>
+ * (SP--)
+ * D=M // presuming M = *SP
+ * @<THIS|THAT>
+ * M=D
+ * 
+ * // push static i
+ * @<filename>.<i>
+ * (*SP = *addr) 
+ * (SP++)
+ * 
+ * // pop static i
+ * @<filename>.<i>
+ * D=A
+ * (SP--)
+ * (*addr = *SP)
+ * 
+ * // @todo - commands
  * 
  */
 
-const SegmentBase = {
-    'local': 1,
-    'argument': 2,
-    'temp': 5
-};
 
-
-// @todo...
 function translate(input) {
     const result = [];
 
