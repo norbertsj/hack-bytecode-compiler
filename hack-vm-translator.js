@@ -16,6 +16,10 @@ const { createInterface } = require('readline');
  * and | x AND y | boolean
  * or  | x OR y  | boolean
  * not | NOT x   | boolean
+ * ------------------------
+ *       x
+ *       y
+ * SP -> ..
  *
  * Segments
  * local
@@ -28,13 +32,17 @@ const { createInterface } = require('readline');
  * temp
  * 
  * Memory map
- * SP   0 Stack pointer
- * LCL  1 local segment
- * ARG  2 argument segment
- * THIS 3 this segment
- * THAT 4 that segment
- * temp 5..12
+ * SP     0 Stack pointer
+ * LCL    1 local segment
+ * ARG    2 argument segment
+ * THIS   3 this segment
+ * THAT   4 that segment
+ * temp   5..12
+ * R13    13
+ * R14    14
+ * R15    15
  * static 16..255 (these are just Hack ASM variables)
+ * stack  256..2047
  * 
  * pointer is either 0/1 (points to THIS or THAT segment base address)
  * THAT = 0
@@ -141,8 +149,89 @@ const { createInterface } = require('readline');
  * (SP--)
  * (*addr = *SP)
  * 
- * // @todo - commands
+ * // Stack arithmetic
+ * x = SP-2
+ * y = SP-1
+ * Pseudo:
+ * SP-- (now points to y)
+ * save y in temp
+ * SP-- (now points to x)
+ * save x in temp
+ * calculate and store value in SP
+ * SP++
  * 
+ * // add
+ * (SP--)
+ * A=M
+ * R15=M // this is y
+ * (SP--)
+ * A=M
+ * D=M // this is x
+ * @R15
+ * D=D+M // x+y
+ * @SP
+ * M=D
+ * (SP++)
+ * 
+ * // sub
+ * (SP--)
+ * A=M
+ * R15=M
+ * (SP--)
+ * A=M
+ * D=M
+ * @R15
+ * D=D-M
+ * @SP
+ * M=D
+ * (SP++)
+ * 
+ * // neg
+ * (SP--)
+ * A=M
+ * D=-M
+ * @SP
+ * M=D
+ * (SP++)
+ * 
+ * // eq
+ * // gt
+ * // lt
+ * hmmmm...
+ * 
+ * // and
+ * (SP--)
+ * A=M
+ * R15=M
+ * (SP--)
+ * A=M
+ * D=M
+ * @R15
+ * D=D&M
+ * @SP
+ * M=D
+ * (SP++)
+ * 
+ * // or
+ * (SP--)
+ * A=M
+ * R15=M
+ * (SP--)
+ * A=M
+ * D=M
+ * @R15
+ * D=D|M
+ * @SP
+ * M=D
+ * (SP++)
+ * 
+ * // not
+ * (SP--)
+ * A=M
+ * D=!M
+ * @SP
+ * M=D
+ * (SP++)
  */
 
 
