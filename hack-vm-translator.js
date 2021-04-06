@@ -163,7 +163,9 @@ const { createInterface } = require('readline');
  * // add
  * (SP--)
  * A=M
- * R15=M // this is y
+ * D=M // this is y
+ * @R15
+ * M=D 
  * (SP--)
  * A=M
  * D=M // this is x
@@ -176,7 +178,9 @@ const { createInterface } = require('readline');
  * // sub
  * (SP--)
  * A=M
- * R15=M
+ * D=M
+ * @R15
+ * M=D
  * (SP--)
  * A=M
  * D=M
@@ -195,14 +199,42 @@ const { createInterface } = require('readline');
  * (SP++)
  * 
  * // eq
+ * (TRUE)
+ *     @SP
+ *     M=-1
+ *     (SP++)
+ * (FALSE)
+ *     @SP
+ *     M=0
+ *     (SP++)
+ * (SP--)
+ * A=M
+ * D=M
+ * @R15
+ * M=D // y
+ * (SP--)
+ * A=M
+ * D=M // x
+ * @R15
+ * D=D-M
+ * @TRUE
+ * D;JEQ
+ * @FALSE
+ * 0;JMP
+ * 
  * // gt
+ * idea: JGT x-y
+ * 
  * // lt
- * hmmmm...
+ * idea: JLT x-y
+ * 
  * 
  * // and
  * (SP--)
  * A=M
- * R15=M
+ * D=M
+ * @R15
+ * M=D
  * (SP--)
  * A=M
  * D=M
@@ -215,7 +247,9 @@ const { createInterface } = require('readline');
  * // or
  * (SP--)
  * A=M
- * R15=M
+ * D=M
+ * @R15
+ * M=D
  * (SP--)
  * A=M
  * D=M
@@ -232,6 +266,8 @@ const { createInterface } = require('readline');
  * @SP
  * M=D
  * (SP++)
+ * 
+ * Ultimate question: how am I gonna jump back to correct routine (if I use jumps)?
  */
 
 
