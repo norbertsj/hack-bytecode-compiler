@@ -149,17 +149,6 @@ const { createInterface } = require('readline');
  * {SP--}
  * {*addr = *SP}
  *
- * // Stack arithmetic
- * x = SP-2
- * y = SP-1
- * Pseudo:
- * SP-- (now points to y)
- * save y in temp
- * SP-- (now points to x)
- * save x in temp
- * calculate and store value in SP
- * SP++
- *
  * // add
  * {SP--}
  * A=M
@@ -327,6 +316,186 @@ const { createInterface } = require('readline');
  *
  */
 
+const CodeBlocks = {
+    setAddress: (segment, i) => [
+        `@${i}`,
+        'D=A',
+        `@${segment}`,
+        'A=D+a'
+    ],
+    fromAddressToStack: () => [
+        'D=M',
+        '@SP',
+        'A=M',
+        'M=D'
+    ],
+    fromStackToAddress: () => [
+        '@R15',
+        'M=D',
+        '@SP',
+        'A=M',
+        'D=M',
+        '@R15',
+        'A=M',
+        'M=D'
+    ],
+    incrementStackPointer: () => [
+        '@SP',
+        'M=M+1'
+    ],
+    decrementStackPointer: () => [
+        '@SP',
+        'M=M-1'
+    ],
+    pushSegment: (segment, i) => [
+        ...CodeBlocks.setAddress(segment, i),
+        ...CodeBlocks.fromAddressToStack(),
+        ...CodeBlocks.incrementStackPointer()
+    ],
+    popSegment: (segment, i) => [
+        ...CodeBlocks.setAddress(segment, i),
+        'D=A',
+        ...CodeBlocks.decrementStackPointer(),
+        ...CodeBlocks.fromStackToAddress()
+    ],
+    pushConstant: (constant) => [
+        `@${constant}`,
+        'D=A',
+        '@SP',
+        'A=M',
+        'M=D',
+        ...CodeBlocks.incrementStackPointer()
+    ],
+    pushPointer: (pointer) => [
+        `@${pointer === 1 ? 'THAT' : 'THIS'}`,
+        'D=M',
+        '@SP',
+        'A=M',
+        'M=D',
+        ...CodeBlocks.incrementStackPointer()
+    ],
+    popPointer: (pointer) => [
+        ...CodeBlocks.decrementStackPointer(),
+        'D=M',
+        `@${pointer === 1 ? 'THAT' : 'THIS'}`,
+        'M=D'
+    ],
+    pushStatic: (fileName, i) => [
+        `@${fileName}.${i}`,
+        ...CodeBlocks.fromAddressToStack(),
+        ...CodeBlocks.incrementStackPointer()
+    ],
+    popStatic: (fileName, i) => [
+        `@${fileName}.${i}`,
+        'D=A',
+        ...CodeBlocks.decrementStackPointer(),
+        ...CodeBlocks.fromStackToAddress()
+    ],
+    setXY: () => [
+        ...CodeBlocks.decrementStackPointer(),
+        'A=M',
+        'D=M',
+        '@R15',
+        'M=D',
+        ...CodeBlocks.decrementStackPointer(),
+        'A=M',
+        'D=M',
+    ],
+    pushResultToStack: () => [
+        '@SP',
+        'M=D',
+        ...CodeBlocks.incrementStackPointer()
+    ],
+    add: () => [
+        ...CodeBlocks.setXY(),
+        '@R15',
+        'D=D+M',
+        ...CodeBlocks.pushResultToStack()
+    ],
+    sub: () => [
+        ...CodeBlocks.setXY(),
+        '@R15',
+        'D=D-M',
+        ...CodeBlocks.pushResultToStack()
+    ],
+    neg: () => [
+        ...CodeBlocks.decrementStackPointer(),
+        'A=M',
+        'D=-M',
+        ...CodeBlocks.pushResultToStack()
+    ],
+    and: () => [
+        ...CodeBlocks.setXY(),
+        '@R15',
+        'D=D&M',
+        ...CodeBlocks.pushResultToStack()
+    ],
+    or: () => [
+        ...CodeBlocks.setXY(),
+        '@R15',
+        'D=D|M',
+        ...CodeBlocks.pushResultToStack()
+    ],
+    not: () => [
+        ...CodeBlocks.decrementStackPointer(),
+        'A=M',
+        'D=!M',
+        ...CodeBlocks.pushResultToStack()
+    ],
+    true: () => [
+        '(TRUE)',
+        '@SP',
+        'M=-1',
+        ...CodeBlocks.incrementStackPointer(),
+        '@R13',
+        '0;JMP'
+    ],
+    false: () => [
+        '(FALSE)',
+        '@SP',
+        'M=0',
+        ...CodeBlocks.incrementStackPointer(),
+        '@R13',
+        '0;JMP'
+    ],
+    compare: (jump, label) => [
+        `(${label})`,
+        ...CodeBlocks.setXY(),
+        '@R15',
+        'D=D-M',
+        '@TRUE',
+        `D;${jump}`,
+        '@FALSE',
+        '0;JMP'
+    ],
+    eq: (n) => [
+        `@EQ.${n}.END`,
+        'D=A',
+        '@R13',
+        'M=D',
+        '@EQ',
+        '0;JMP',
+        `(EQ.${n}.END)`
+    ],
+    lt: (n) => [
+        `@LT.${n}.END`,
+        'D=A',
+        '@R13',
+        'M=D',
+        '@LT',
+        '0;JMP',
+        `(LT.${n}.END)`
+    ],
+    gt: (n) => [
+        `@GT.${n}.END`,
+        'D=A',
+        '@R13',
+        'M=D',
+        '@GT',
+        '0;JMP',
+        `(GT.${n}.END)`
+    ]
+}
 
 function translate(input) {
     const result = [];
