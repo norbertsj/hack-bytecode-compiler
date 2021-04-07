@@ -30,7 +30,7 @@ const { createInterface } = require('readline');
  * static
  * pointer
  * temp
- * 
+ *
  * Memory map
  * SP     0 Stack pointer
  * LCL    1 local segment
@@ -43,7 +43,7 @@ const { createInterface } = require('readline');
  * R15    15
  * static 16..255 (these are just Hack ASM variables)
  * stack  256..2047
- * 
+ *
  * pointer is either 0/1 (points to THIS or THAT segment base address)
  * THAT = 0
  * THIS = 1
@@ -52,41 +52,41 @@ const { createInterface } = require('readline');
  * ptr  = <addr>
  * &ptr = Memory[<ptr>]
  * *ptr = Memory[<addr>]
- * 
+ *
  * push segment i
  * addr = segmentPointer + i; *SP = *addr; SP++
  *
  * pop segment i
  * addr = segmentPointer + i; SP--; *addr = *SP
- * 
+ *
  * push constant i
  * *SP = i; SP++
- * 
+ *
  * push pointer 0/1
  * *SP = THIS/THAT; SP++
- * 
+ *
  * pop pointer 0/1
- * SP--; THIS/THAT = *SP 
+ * SP--; THIS/THAT = *SP
  *
  * Static
  * Static vars translate to Hack ASM variables
  * In file <filename>.vm static vars translate to Hack ASM vars with name <filename>.<i>
- * 
- * 
+ *
+ *
  * Lets try writing Hack assembly here to see how to actually implement
- * 
+ *
  * // addr = segmentPointer + i
  * @<i>
  * D=A
  * @<segmentPointer(LCL|ARG|THIS|THAT|5(temp))>
  * A=D+A
- * 
+ *
  * // *SP = *addr (presume: A=addr; M=*addr)
  * D=M
  * @SP
  * A=M
  * M=D
- * 
+ *
  * // *addr = *SP (presume: A=&SP; M=SP; D=addr)
  * @R15
  * M=D // save the addr in R15
@@ -96,59 +96,59 @@ const { createInterface } = require('readline');
  * @R15
  * A=M
  * M=D // and finally *addr = *SP
- * 
+ *
  * // SP++
- * @SP 
+ * @SP
  * M=M+1
- * 
+ *
  * // SP--
  * @SP
  * M=M-1
- * 
+ *
  * // push segment i
- * (addr = segmentPointer + i)
- * (*SP = *addr) 
- * (SP++)
- * 
+ * {addr = segmentPointer + i}
+ * {*SP = *addr}
+ * {SP++}
+ *
  * // pop segment i
- * (addr = segmentPointer + i)
+ * {addr = segmentPointer + i}
  * D=A
- * (SP--)
- * (*addr = *SP)
- * 
+ * {SP--}
+ * {*addr = *SP}
+ *
  * // push constant <CONST>
  * @<CONST>
  * D=A
  * @SP
  * A=M
  * M=D
- * (SP++)
- * 
+ * {SP++}
+ *
  * // push pointer <0|1>
  * @<THIS|THAT>
  * D=M
  * @SP
  * A=M
  * M=D
- * (SP++)
- * 
+ * {SP++}
+ *
  * // pop pointer <0|1>
- * (SP--)
+ * {SP--}
  * D=M // presuming M = *SP
  * @<THIS|THAT>
  * M=D
- * 
+ *
  * // push static i
  * @<filename>.<i>
- * (*SP = *addr) 
- * (SP++)
- * 
+ * {*SP = *addr}
+ * {SP++}
+ *
  * // pop static i
  * @<filename>.<i>
  * D=A
- * (SP--)
- * (*addr = *SP)
- * 
+ * {SP--}
+ * {*addr = *SP}
+ *
  * // Stack arithmetic
  * x = SP-2
  * y = SP-1
@@ -159,55 +159,61 @@ const { createInterface } = require('readline');
  * save x in temp
  * calculate and store value in SP
  * SP++
- * 
+ *
  * // add
- * (SP--)
+ * {SP--}
  * A=M
  * D=M // this is y
  * @R15
- * M=D 
- * (SP--)
+ * M=D
+ * {SP--}
  * A=M
  * D=M // this is x
  * @R15
  * D=D+M // x+y
  * @SP
  * M=D
- * (SP++)
- * 
+ * {SP++}
+ *
  * // sub
- * (SP--)
+ * {SP--}
  * A=M
  * D=M
  * @R15
  * M=D
- * (SP--)
+ * {SP--}
  * A=M
  * D=M
  * @R15
  * D=D-M
  * @SP
  * M=D
- * (SP++)
- * 
+ * {SP++}
+ *
  * // neg
- * (SP--)
+ * {SP--}
  * A=M
  * D=-M
  * @SP
  * M=D
- * (SP++)
- * 
- * // eq
+ * {SP++}
+ *
+ *
  * (TRUE)
  *     @SP
  *     M=-1
- *     (SP++)
+ *     {SP++}
+ *     @R13
+ *     0;JMP
  * (FALSE)
  *     @SP
  *     M=0
- *     (SP++)
- * (SP--)
+ *     {SP++}
+ *     @R13
+ *     0;JMP
+ *
+ * (EQ)
+ * {SP--}
  * A=M
  * D=M
  * @R15
@@ -221,53 +227,104 @@ const { createInterface } = require('readline');
  * D;JEQ
  * @FALSE
  * 0;JMP
- * 
- * // gt
- * idea: JGT x-y
- * 
- * // lt
- * idea: JLT x-y
- * 
- * 
- * // and
+ *
+ * (GT)
+ * {SP--}
+ * A=M
+ * D=M
+ * @R15
+ * M=D // y
  * (SP--)
+ * A=M
+ * D=M // x
+ * @R15
+ * D=D-M
+ * @TRUE
+ * D;JGT
+ * @FALSE
+ * 0;JMP
+ *
+ * (LT)
+ * {SP--}
+ * A=M
+ * D=M
+ * @R15
+ * M=D // y
+ * (SP--)
+ * A=M
+ * D=M // x
+ * @R15
+ * D=D-M
+ * @TRUE
+ * D;JLT
+ * @FALSE
+ * 0;JMP
+ *
+ * // eq
+ * @EQ.<N>.END
+ * D=A
+ * @R13
+ * M=D
+ * @EQ
+ * 0;JMP
+ * (EQ.<N>.END)
+ *
+ * // gt
+ * @GT.<N>.END
+ * D=A
+ * @R13
+ * M=D
+ * @GT
+ * 0;JMP
+ * (GT.<N>.END)
+ *
+ * // lt
+ * @LT.<N>.END
+ * D=A
+ * @R13
+ * M=D
+ * @LT
+ * 0;JMP
+ * (LT.<N>.END)
+ *
+ * // and
+ * {SP--}
  * A=M
  * D=M
  * @R15
  * M=D
- * (SP--)
+ * {SP--}
  * A=M
  * D=M
  * @R15
  * D=D&M
  * @SP
  * M=D
- * (SP++)
- * 
+ * {SP++}
+ *
  * // or
- * (SP--)
+ * {SP--}
  * A=M
  * D=M
  * @R15
  * M=D
- * (SP--)
+ * {SP--}
  * A=M
  * D=M
  * @R15
  * D=D|M
  * @SP
  * M=D
- * (SP++)
- * 
+ * {SP++}
+ *
  * // not
- * (SP--)
+ * {SP--}
  * A=M
  * D=!M
  * @SP
  * M=D
- * (SP++)
- * 
- * Ultimate question: how am I gonna jump back to correct routine (if I use jumps)?
+ * {SP++}
+ *
  */
 
 
