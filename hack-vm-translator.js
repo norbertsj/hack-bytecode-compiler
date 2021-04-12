@@ -44,17 +44,20 @@ const CodeBlocks = {
         'M=M-1'
     ],
     pushSegment: (segment, i) => [
+        `// push ${segment} ${i}`,
         ...CodeBlocks.setAddress(segment, i),
         ...CodeBlocks.fromAddressToStack(),
         ...CodeBlocks.incrementStackPointer()
     ],
     popSegment: (segment, i) => [
+        `// pop ${segment} ${i}`,
         ...CodeBlocks.setAddress(segment, i),
         'D=A',
         ...CodeBlocks.decrementStackPointer(),
         ...CodeBlocks.fromStackToAddress()
     ],
     pushConstant: (constant) => [
+        `// push constant ${constant}`,
         `@${constant}`,
         'D=A',
         '@SP',
@@ -63,6 +66,7 @@ const CodeBlocks = {
         ...CodeBlocks.incrementStackPointer()
     ],
     pushPointer: (pointer) => [
+        `// push pointer ${pointer}`,
         `@${pointer === 1 ? 'THAT' : 'THIS'}`,
         'D=M',
         '@SP',
@@ -71,17 +75,20 @@ const CodeBlocks = {
         ...CodeBlocks.incrementStackPointer()
     ],
     popPointer: (pointer) => [
+        `// pop pointer ${pointer}`,
         ...CodeBlocks.decrementStackPointer(),
         'D=M',
         `@${pointer === 1 ? 'THAT' : 'THIS'}`,
         'M=D'
     ],
     pushStatic: (fileName, i) => [
+        `// push static ${i}`,
         `@${fileName}.${i}`,
         ...CodeBlocks.fromAddressToStack(),
         ...CodeBlocks.incrementStackPointer()
     ],
     popStatic: (fileName, i) => [
+        `// pop static ${i}`,
         `@${fileName}.${i}`,
         'D=A',
         ...CodeBlocks.decrementStackPointer(),
@@ -102,37 +109,43 @@ const CodeBlocks = {
         'M=D',
         ...CodeBlocks.incrementStackPointer()
     ],
-    add: [
+    add: () => [
+        '// add',
         ...CodeBlocks.setXY(),
         '@R15',
         'D=D+M',
         ...CodeBlocks.pushResultToStack()
     ],
-    sub: [
+    sub: () => [
+        '// sub',
         ...CodeBlocks.setXY(),
         '@R15',
         'D=D-M',
         ...CodeBlocks.pushResultToStack()
     ],
-    neg: [
+    neg: () => [
+        '// neg',
         ...CodeBlocks.decrementStackPointer(),
         'A=M',
         'D=-M',
         ...CodeBlocks.pushResultToStack()
     ],
-    and: [
+    and: () => [
+        '// and',
         ...CodeBlocks.setXY(),
         '@R15',
         'D=D&M',
         ...CodeBlocks.pushResultToStack()
     ],
-    or: [
+    or: () => [
+        '// or',
         ...CodeBlocks.setXY(),
         '@R15',
         'D=D|M',
         ...CodeBlocks.pushResultToStack()
     ],
-    not: [
+    not: () => [
+        '// not',
         ...CodeBlocks.decrementStackPointer(),
         'A=M',
         'D=!M',
@@ -140,31 +153,34 @@ const CodeBlocks = {
     ],
     true: () => [
         '(TRUE)',
-        '@SP',
-        'M=-1',
-        ...CodeBlocks.incrementStackPointer(),
-        '@R13',
-        '0;JMP'
+        '    @SP',
+        '    M=-1',
+        ...CodeBlocks.incrementStackPointer().map(i => `    ${i}`),
+        '    @R13',
+        '    A=M',
+        '    0;JMP'
     ],
     false: () => [
         '(FALSE)',
-        '@SP',
-        'M=0',
-        ...CodeBlocks.incrementStackPointer(),
-        '@R13',
-        '0;JMP'
+        '    @SP',
+        '    M=0',
+        ...CodeBlocks.incrementStackPointer().map(i => `    ${i}`),
+        '    @R13',
+        '    A=M',
+        '    0;JMP'
     ],
     compare: (jump, label) => [
         `(${label})`,
-        ...CodeBlocks.setXY(),
-        '@R15',
-        'D=D-M',
-        '@TRUE',
-        `D;${jump}`,
-        '@FALSE',
-        '0;JMP'
+        ...CodeBlocks.setXY().map(i => `    ${i}`),
+        '    @R15',
+        '    D=D-M',
+        '    @TRUE',
+        `    D;${jump}`,
+        '    @FALSE',
+        '    0;JMP'
     ],
     eq: (n) => [
+        '// eq',
         `@EQ.${n}.END`,
         'D=A',
         '@R13',
@@ -174,6 +190,7 @@ const CodeBlocks = {
         `(EQ.${n}.END)`
     ],
     lt: (n) => [
+        '// lt',
         `@LT.${n}.END`,
         'D=A',
         '@R13',
@@ -183,6 +200,7 @@ const CodeBlocks = {
         `(LT.${n}.END)`
     ],
     gt: (n) => [
+        '// gt',
         `@GT.${n}.END`,
         'D=A',
         '@R13',
@@ -239,9 +257,9 @@ function parseInstruction(instruction, fileName) {
             }
 
             return block;
-        } else {
-            return CodeBlocks[instruction];
         }
+
+        return CodeBlocks[instruction]();
     } else {
         const [operation, segment, i] = instruction.split(' ');
 
@@ -251,37 +269,75 @@ function parseInstruction(instruction, fileName) {
             }
 
             return CodeBlocks.popSegment(SegmentCodes[segment], i);
-        } else {
-            switch (segment) {
-                case 'constant':
-                    return CodeBlocks.pushConstant(i);
-                case 'static':
-                    if (operation === 'push') {
-                        return CodeBlocks.pushStatic(fileName, i);
-                    }
+        }
 
-                    return CodeBlocks.popStatic(fileName, i);
-                case 'pointer':
-                    if (operation === 'push') {
-                        return CodeBlocks.pushPointer(i);
-                    }
-                    
-                    return CodeBlocks.popPointer(i);
-                default:
-                    throw new Error('Invalid memory segment');
-            }
+        switch (segment) {
+            case 'constant':
+                return CodeBlocks.pushConstant(i);
+            case 'static':
+                if (operation === 'push') {
+                    return CodeBlocks.pushStatic(fileName, i);
+                }
+
+                return CodeBlocks.popStatic(fileName, i);
+            case 'pointer':
+                if (operation === 'push') {
+                    return CodeBlocks.pushPointer(i);
+                }
+
+                return CodeBlocks.popPointer(i);
+            default:
+                throw new Error('Invalid memory segment');
         }
     }
 }
 
-function translate(input) {
+function removeCommentsAndEmptyLines(input) {
     const result = [];
 
+    for (const line of input) {
+        if (!line.startsWith('//') && line.trim() !== '') {
+            result.push(line.trim());
+        }
+    }
+
+    return result;
+}
+
+function translate(input, fileName) {
     if (!input || input.length === 0) {
         throw new Error('Invalid input');
     }
 
-    return result;
+    const byteCode = removeCommentsAndEmptyLines(input);
+    let asmCode = [];
+
+    for (const line of byteCode) {
+        asmCode = [...asmCode, ...parseInstruction(line, fileName), ''];
+    }
+
+    if (comparisonCommandsUsed) {
+        asmCode = [
+            '@START',
+            '0;JMP',
+            '',
+            ...CodeBlocks.true(),
+            '',
+            ...CodeBlocks.false(),
+            '',
+            ...CodeBlocks.compare('JEQ', 'EQ'),
+            '',
+            ...CodeBlocks.compare('JLT', 'LT'),
+            '',
+            ...CodeBlocks.compare('JGT', 'GT'),
+            '',
+            '(START)',
+            '',
+            ...asmCode
+        ];
+    }
+
+    return asmCode;
 }
 
 function main() {
