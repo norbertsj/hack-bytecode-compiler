@@ -4,20 +4,25 @@
 const { createReadStream, createWriteStream } = require('fs');
 const { createInterface } = require('readline');
 
- const SegmentCodes = {
+const SegmentCodes = {
     local: 'LCL',
     argument: 'ARG',
-    this: 'this',
-    that: 'that',
+    this: 'THIS',
+    that: 'THAT',
     temp: 5
 };
+
+const Pointers = {
+    '0': 'THIS',
+    '1': 'THAT'
+}
 
 const CodeBlocks = {
     setAddress: (segment, i) => [
         `@${i}`,
         'D=A',
         `@${segment}`,
-        'A=D+a'
+        segment === SegmentCodes.temp ? 'A=D+A' : 'A=D+M'
     ],
     fromAddressToStack: () => [
         'D=M',
@@ -44,13 +49,11 @@ const CodeBlocks = {
         'M=M-1'
     ],
     pushSegment: (segment, i) => [
-        `// push ${segment} ${i}`,
         ...CodeBlocks.setAddress(segment, i),
         ...CodeBlocks.fromAddressToStack(),
         ...CodeBlocks.incrementStackPointer()
     ],
     popSegment: (segment, i) => [
-        `// pop ${segment} ${i}`,
         ...CodeBlocks.setAddress(segment, i),
         'D=A',
         ...CodeBlocks.decrementStackPointer(),
@@ -67,7 +70,7 @@ const CodeBlocks = {
     ],
     pushPointer: (pointer) => [
         `// push pointer ${pointer}`,
-        `@${pointer === 1 ? 'THAT' : 'THIS'}`,
+        `@${Pointers[pointer]}`,
         'D=M',
         '@SP',
         'A=M',
@@ -77,8 +80,9 @@ const CodeBlocks = {
     popPointer: (pointer) => [
         `// pop pointer ${pointer}`,
         ...CodeBlocks.decrementStackPointer(),
+        'A=M',
         'D=M',
-        `@${pointer === 1 ? 'THAT' : 'THIS'}`,
+        `@${Pointers[pointer]}`,
         'M=D'
     ],
     pushStatic: (fileName, i) => [
@@ -106,6 +110,7 @@ const CodeBlocks = {
     ],
     pushResultToStack: () => [
         '@SP',
+        'A=M',
         'M=D',
         ...CodeBlocks.incrementStackPointer()
     ],
@@ -154,6 +159,7 @@ const CodeBlocks = {
     true: () => [
         '(TRUE)',
         '    @SP',
+        '    A=M',
         '    M=-1',
         ...CodeBlocks.incrementStackPointer().map(i => `    ${i}`),
         '    @R13',
@@ -163,6 +169,7 @@ const CodeBlocks = {
     false: () => [
         '(FALSE)',
         '    @SP',
+        '    A=M',
         '    M=0',
         ...CodeBlocks.incrementStackPointer().map(i => `    ${i}`),
         '    @R13',
@@ -265,10 +272,10 @@ function parseInstruction(instruction, fileName) {
 
         if (Object.keys(SegmentCodes).includes(segment)) {
             if (operation === 'push') {
-                return CodeBlocks.pushSegment(SegmentCodes[segment], i);
+                return [`// push ${segment} ${i}`, ...CodeBlocks.pushSegment(SegmentCodes[segment], i)];
             }
 
-            return CodeBlocks.popSegment(SegmentCodes[segment], i);
+            return [`// pop ${segment} ${i}`, ...CodeBlocks.popSegment(SegmentCodes[segment], i)];
         }
 
         switch (segment) {
@@ -361,7 +368,7 @@ function main() {
 
     rl.on('line', (line) => input.push(line));
     rl.on('close', () => {
-        const output = translate(input);
+        const output = translate(input, fileName);
         const wstream = createWriteStream(`${fileName}.asm`);
         for (const line of output) {
             wstream.write(line + '\n');

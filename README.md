@@ -115,7 +115,7 @@ addr = segmentPointer + i
 @<i>
 D=A
 @<segmentPointer>
-A=D+A
+A=D+M
 ```
 
 *SP = *addr (presume: A=addr; M=\*addr)
@@ -197,7 +197,8 @@ pop pointer <0|1>
 
 ```
 {SP--}
-D=M // presuming M = *SP
+A=M
+D=M
 @<THIS|THAT>
 M=D
 ```
@@ -235,6 +236,7 @@ D=M // this is x
 @R15
 D=D+M // x+y
 @SP
+A=M
 M=D
 {SP++}
 
@@ -255,6 +257,7 @@ D=M
 @R15
 D=D-M
 @SP
+A=M
 M=D
 {SP++}
 
@@ -268,6 +271,7 @@ neg
 A=M
 D=-M
 @SP
+A=M
 M=D
 {SP++}
 
@@ -288,6 +292,7 @@ D=M
 @R15
 D=D&M
 @SP
+A=M
 M=D
 {SP++}
 
@@ -308,6 +313,7 @@ D=M
 @R15
 D=D|M
 @SP
+A=M
 M=D
 {SP++}
 
@@ -321,6 +327,7 @@ not
 A=M
 D=!M
 @SP
+A=M
 M=D
 {SP+
 
@@ -332,6 +339,7 @@ TRUE
 
 (TRUE)
 @SP
+A=M
 M=-1
 {SP++}
 @R13
@@ -344,6 +352,7 @@ FALSE
 ```
 (FALSE)
 @SP
+A=M
 M=0
 {SP++}
 @R13
