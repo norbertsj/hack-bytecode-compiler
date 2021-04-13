@@ -1,5 +1,10 @@
 # Hack VM Translator
 
+**Notes and todos**
+
+-   Refactor (maybe in OOP fashion)
+-   Try to write more optimal ASM
+
 ## Arithmetic/Logic commands
 
 | Command | Expression | Return type |
