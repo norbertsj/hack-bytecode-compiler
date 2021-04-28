@@ -1,9 +1,14 @@
 # Hack VM Translator
 
-**Notes and todos**
+**TODO**
 
--   Refactor (maybe in OOP fashion)
--   Try to write more optimal ASM
+-   support for whole directory (with Main.vm) or single file (remember about Static)
+-   label
+-   goto
+-   if-goto
+-   function
+-   call
+-   return
 
 ## Arithmetic/Logic commands
 
