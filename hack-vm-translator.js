@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 'use strict';
 
-const { createReadStream, createWriteStream } = require('fs');
+const { createReadStream, createWriteStream, statSync, readdirSync } = require('fs');
 const { createInterface } = require('readline');
+const path = require('path');
 
 const SegmentCodes = {
     local: 'LCL',
@@ -347,35 +348,72 @@ function translate(input, fileName) {
     return asmCode;
 }
 
-function main() {
-    const args = process.argv.slice(2);
-    const path = args[0];
+function writeFile(filePath, data) {
+    const wstream = createWriteStream(filePath);
 
-    if (!path) {
-        console.log('Please provide VM file as an argument (local dir only)');
-        return;
+    for (const line of data) {
+        wstream.write(line + '\n');
+    }
+}
+
+function readFile(filePath) {
+    return new Promise((resolve) => {
+        const data = [];
+
+        const rl = createInterface({
+            input: createReadStream(filePath),
+            crlfDelay: Infinity
+        });
+
+        rl.on('line', (line) => data.push(line));
+
+        rl.on('close', () => {
+            resolve(data);
+        });
+    });
+}
+
+async function run() {
+    const args = process.argv.slice(2);
+    const providedPath = args[0];
+
+    if (!providedPath) {
+        throw new Error('Path is missing');
     }
 
-    const fileName = path.split('.')[0];
-    const input = [];
+    const parsedPath = path.parse(providedPath);
+    const stats = statSync(providedPath);
 
-    console.log(`Translating ${fileName}.vm file...`)
+    let outputData, outputFile;
 
-    const rl = createInterface({
-        input: createReadStream(path),
-        crlfDelay: Infinity
-    });
+    if (parsedPath.ext === '.vm' && !stats.isDirectory()) {
+        console.log(`Translating file ${parsedPath.base} into ${parsedPath.name}.asm...`);
+        const input = await readFile(providedPath);
+        outputData = translate(input, parsedPath.name);
+        outputFile = parsedPath.name + '.asm';
+    } else if (parsedPath.ext === '' && stats.isDirectory() && readdirSync(providedPath).length !== 0 && readdirSync(providedPath).map(f => f.toLowerCase()).includes('main.vm')) {
+        console.log('Translating directory ===> TODO...');
+        // const files = readdirSync(providedPath).map(f => f.toLowerCase());
+        // console.log(files);
 
-    rl.on('line', (line) => input.push(line));
-    rl.on('close', () => {
-        const output = translate(input, fileName);
-        const wstream = createWriteStream(`${fileName}.asm`);
-        for (const line of output) {
-            wstream.write(line + '\n');
-        }
+        // for (const file of files) {
+        //     const data = await readFile(`${providedPath}/${file}`);
+        //     console.log(data);
+        // }
+    } else {
+        throw new Error('Invalid path (must be either a file with .vm extension or a directory with Main.vm/main.vm in it)');
+    }
 
-        console.log('Done');
-    });
+    writeFile(outputFile, outputData);
+    console.log('Done!');
+}
+
+function main() {
+    try {
+        run();
+    } catch (e) {
+        console.log(`Error: ${e.message}`);
+    }
 }
 
 main();
