@@ -216,6 +216,27 @@ const CodeBlocks = {
         '@GT',
         '0;JMP',
         `(GT.${n}.END)`
+    ],
+    label: (name) => [
+        `// label ${name}`,
+        `(${name})`
+    ],
+    labelInFunction: (name, functionName, fileName) => [
+        `// label ${name} (inside function)`,
+        `(${fileName}.${functionName}$${name})`
+    ],
+    goto: (label) => [
+        `// goto ${label}`,
+        `@${label}`,
+        '0;JMP'
+    ],
+    ifgoto: (label) => [
+        `// if-goto ${label}`,
+        ...CodeBlocks.decrementStackPointer(),
+        'A=M',
+        'D=M',
+        `@${label}`,
+        'D;JNE' // if D !== 0 (true) => jump
     ]
 };
 
@@ -243,8 +264,20 @@ let eqCount = 0;
 let ltCount = 0;
 let gtCount = 0;
 
+// indicates which function currently we are translating (if any)
+let currentFunction = null;
+
 function parseInstruction(instruction, fileName) {
-    if (Commands.includes(instruction)) {
+    if (instruction.startsWith('label')) {
+        // later: determine if the label is inside a function
+        return CodeBlocks.label(instruction.split(' ').pop());
+    } else if (instruction.startsWith('goto')) {
+        // later: determine if the label is inside a function
+        return CodeBlocks.goto(instruction.split(' ').pop());
+    } else if (instruction.startsWith('if-goto')) {
+        // later: determine if the label is inside a function
+        return CodeBlocks.ifgoto(instruction.split(' ').pop());
+    } else if (Commands.includes(instruction)) {
         if (ComparisonCommands.includes(instruction)) {
             comparisonCommandsUsed = true;
             let block;
@@ -402,6 +435,11 @@ async function run() {
         // }
     } else {
         throw new Error('Invalid path (must be either a file with .vm extension or a directory with Main.vm/main.vm in it)');
+    }
+
+    if (parsedPath.dir.length > 0) {
+        // write file to the same location where it was read from
+        outputFile = `${parsedPath.dir}/${outputFile}`;
     }
 
     writeFile(outputFile, outputData);
