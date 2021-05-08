@@ -18,6 +18,33 @@ const Pointers = {
     '1': 'THAT'
 }
 
+const Commands = [
+    'add',
+    'sub',
+    'neg',
+    'and',
+    'or',
+    'not',
+    'eq',
+    'lt',
+    'gt'
+];
+
+const ComparisonCommands = [
+    'eq',
+    'lt',
+    'gt'
+];
+
+// indicates if we need to add comparison code blocks at the top of the ASM file
+let comparisonCommandsUsed = false;
+let eqCount = 0;
+let ltCount = 0;
+let gtCount = 0;
+
+// indicates which function currently we are translating (if any)
+let currentFunction = null;
+
 const CodeBlocks = {
     setAddress: (segment, i) => [
         `@${i}`,
@@ -237,38 +264,94 @@ const CodeBlocks = {
         'D=M',
         `@${label}`,
         'D;JNE' // if D !== 0 (true) => jump
-    ]
+    ],
+    initFunction: (instruction, fileName) => {
+        const [, functionName, nVars] = instruction.split(' ');
+        currentFunction = `${fileName}.${functionName}`;
+        let code = [
+            `// ${instruction}`,
+            `(${currentFunction})`
+        ];
+    
+        if (nVars && parseInt(nVars, 10) !== 0) {
+            for (let i = 0; i < parseInt(nVars, 10); i++) {
+                const block = CodeBlocks.pushConstant(0);
+                code = [...code, ...block];
+            }
+        }
+    
+        return code;
+    },
+    returnFromFunction: () => {
+        currentFunction = null;
+
+        return [
+            '// return',
+            // save callers endframe address (which is callees LCL)
+            '@LCL',
+            'D=M',
+            '@ENDFRAME',
+            'M=D',
+            // save callers return address (endframe - 5)
+            'D=D-1',
+            'D=D-1',
+            'D=D-1',
+            'D=D-1',
+            'D=D-1',
+            'A=D',
+            'D=M',
+            '@RETADDR',
+            'M=D',
+            // store callees return value into ARG
+            ...CodeBlocks.popSegment('ARG', 0),
+            // restore SP for caller (SP = ARG + 1)
+            '@ARG',
+            'D=M',
+            '@SP',
+            'M=D+1',
+            // restore THAT for caller (THAT = *(endframe - 1))
+            '@ENDFRAME',
+            'A=M-1',
+            'D=M',
+            '@THAT',
+            'M=D',
+            // restore THIS for caller (THIS = *(endframe - 2))
+            '@ENDFRAME',
+            'A=M-1',
+            'A=A-1',
+            'D=M',
+            '@THIS',
+            'M=D',
+            // restore ARG for caller (ARG = *(endframe - 3))
+            '@ENDFRAME',
+            'A=M-1',
+            'A=A-1',
+            'A=A-1',
+            'D=M',
+            '@ARG',
+            'M=D',
+            // restore LCL for caller (LCL = *(endframe - 4))
+            '@ENDFRAME',
+            'A=M-1',
+            'A=A-1',
+            'A=A-1',
+            'A=A-1',
+            'D=M',
+            '@LCL',
+            'M=D',
+            // jump to callers return address
+            '@RETADDR',
+            '0;JMP'
+        ];
+    }
 };
 
-const Commands = [
-    'add',
-    'sub',
-    'neg',
-    'and',
-    'or',
-    'not',
-    'eq',
-    'lt',
-    'gt'
-];
-
-const ComparisonCommands = [
-    'eq',
-    'lt',
-    'gt'
-];
-
-// indicates if we need to add comparison code blocks at the top of the ASM file
-let comparisonCommandsUsed = false;
-let eqCount = 0;
-let ltCount = 0;
-let gtCount = 0;
-
-// indicates which function currently we are translating (if any)
-let currentFunction = null;
-
 function parseInstruction(instruction, fileName) {
-    if (instruction.startsWith('label')) {
+    if (instruction.startsWith('function')) {
+        return CodeBlocks.initFunction(instruction, fileName);
+    } else if (instruction === 'return') {
+        return CodeBlocks.returnFromFunction();
+    } else if (instruction.startsWith('label')) {
         // later: determine if the label is inside a function
         return CodeBlocks.label(instruction.split(' ').pop());
     } else if (instruction.startsWith('goto')) {
