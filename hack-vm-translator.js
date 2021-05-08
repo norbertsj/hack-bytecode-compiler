@@ -265,12 +265,12 @@ const CodeBlocks = {
         `@${label}`,
         'D;JNE' // if D !== 0 (true) => jump
     ],
-    initFunction: (instruction, fileName) => {
+    initFunction: (instruction) => {
         const [, functionName, nVars] = instruction.split(' ');
-        currentFunction = `${fileName}.${functionName}`;
+        currentFunction = functionName;
         let code = [
             `// ${instruction}`,
-            `(${currentFunction})`
+            `(${functionName})`
         ];
     
         if (nVars && parseInt(nVars, 10) !== 0) {
@@ -348,7 +348,7 @@ const CodeBlocks = {
 
 function parseInstruction(instruction, fileName) {
     if (instruction.startsWith('function')) {
-        return CodeBlocks.initFunction(instruction, fileName);
+        return CodeBlocks.initFunction(instruction);
     } else if (instruction === 'return') {
         return CodeBlocks.returnFromFunction();
     } else if (instruction.startsWith('label')) {
