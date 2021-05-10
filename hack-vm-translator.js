@@ -45,6 +45,9 @@ let gtCount = 0;
 // indicates which function currently we are translating (if any)
 let currentFunction = null;
 
+// dictionary for tracking call count in current function
+const calls = {};
+
 const CodeBlocks = {
     setAddress: (segment, i) => [
         `@${i}`,
@@ -246,15 +249,11 @@ const CodeBlocks = {
     ],
     label: (name) => [
         `// label ${name}`,
-        `(${name})`
-    ],
-    labelInFunction: (name, functionName, fileName) => [
-        `// label ${name} (inside function)`,
-        `(${fileName}.${functionName}$${name})`
+        `(${currentFunction ? currentFunction + '$' + name : name})`
     ],
     goto: (label) => [
         `// goto ${label}`,
-        `@${label}`,
+        `@${currentFunction ? currentFunction + '$' + label : label}`,
         '0;JMP'
     ],
     ifgoto: (label) => [
@@ -262,10 +261,10 @@ const CodeBlocks = {
         ...CodeBlocks.decrementStackPointer(),
         'A=M',
         'D=M',
-        `@${label}`,
+        `@${currentFunction ? currentFunction + '$' + label : label}`,
         'D;JNE' // if D !== 0 (true) => jump
     ],
-    initFunction: (instruction) => {
+    handleFunction: (instruction) => {
         const [, functionName, nVars] = instruction.split(' ');
         currentFunction = functionName;
         let code = [
@@ -282,83 +281,161 @@ const CodeBlocks = {
     
         return code;
     },
-    returnFromFunction: () => {
-        currentFunction = null;
+    handleCall: (instruction) => {
+        const [, functionName, nArgs] = instruction.split(' ');
 
-        return [
-            '// return',
-            // save callers endframe address (which is callees LCL)
-            '@LCL',
-            'D=M',
-            '@ENDFRAME',
-            'M=D',
-            // save callers return address (endframe - 5)
-            'D=D-1',
-            'D=D-1',
-            'D=D-1',
-            'D=D-1',
-            'D=D-1',
-            'A=D',
-            'D=M',
-            '@RETADDR',
-            'M=D',
-            // store callees return value into ARG
-            ...CodeBlocks.popSegment('ARG', 0),
-            // restore SP for caller (SP = ARG + 1)
-            '@ARG',
-            'D=M',
+        // @todo: understand how to handle this from booting
+        if (typeof calls[currentFunction] !== 'undefined') {
+            calls[currentFunction] += 1;
+        } else {
+            calls[currentFunction] = 1;
+        }
+
+        const returnAddressLabel = `${currentFunction}$ret.${calls[currentFunction]}`;
+
+        let code = [
+            `// ${instruction}`,
+            // push returnAddressLabel
+            `@${returnAddressLabel}`,
+            'D=A',
             '@SP',
-            'M=D+1',
-            // restore THAT for caller (THAT = *(endframe - 1))
-            '@ENDFRAME',
-            'A=M-1',
-            'D=M',
-            '@THAT',
+            'A=M',
             'M=D',
-            // restore THIS for caller (THIS = *(endframe - 2))
-            '@ENDFRAME',
-            'A=M-1',
-            'A=A-1',
-            'D=M',
+            ...CodeBlocks.incrementStackPointer(),
+            // push LCL
+            '@LCL',
+            'D=A',
+            '@SP',
+            'A=M',
+            'M=D',
+            ...CodeBlocks.incrementStackPointer(),
+             // push ARG
+             '@ARG',
+             'D=A',
+             '@SP',
+             'A=M',
+             'M=D',
+             ...CodeBlocks.incrementStackPointer(),
+              // push THIS
             '@THIS',
+            'D=A',
+            '@SP',
+            'A=M',
             'M=D',
-            // restore ARG for caller (ARG = *(endframe - 3))
-            '@ENDFRAME',
-            'A=M-1',
-            'A=A-1',
-            'A=A-1',
-            'D=M',
+            ...CodeBlocks.incrementStackPointer(),
+             // push THAT
+             '@THAT',
+             'D=A',
+             '@SP',
+             'A=M',
+             'M=D',
+             ...CodeBlocks.incrementStackPointer(),
+             // set ARG for callee (part 1)
+             '@SP',
+             'D=M-1',
+             'D=D-1',
+             'D=D-1',
+             'D=D-1',
+             'D=D-1',
+        ];
+
+        // set ARG for callee (part 2)
+        if (nArgs && parseInt(nArgs, 10) !== 0) {
+            for (let i = 0; i < parseInt(nArgs, 10); i++) {
+                code.push('D=D-1');
+            }
+        }
+
+        code = [
+            ...code,
             '@ARG',
             'M=D',
-            // restore LCL for caller (LCL = *(endframe - 4))
-            '@ENDFRAME',
-            'A=M-1',
-            'A=A-1',
-            'A=A-1',
-            'A=A-1',
+            // LCL = SP
+            '@SP',
             'D=M',
             '@LCL',
             'M=D',
-            // jump to callers return address
-            '@RETADDR',
-            '0;JMP'
+            // goto functionName
+            `@${functionName}`,
+            '0;JMP',
+            // (returnAddressLabel)
+            `(${returnAddressLabel})`
         ];
-    }
+
+        return code;
+    },
+    handleReturn: () => [
+        '// return',
+        // save callers endframe address (which is callees LCL)
+        '@LCL',
+        'D=M',
+        '@ENDFRAME',
+        'M=D',
+        // save callers return address (endframe - 5)
+        'D=D-1',
+        'D=D-1',
+        'D=D-1',
+        'D=D-1',
+        'D=D-1',
+        'A=D',
+        'D=M',
+        '@RETADDR',
+        'M=D',
+        // store callees return value into ARG
+        ...CodeBlocks.popSegment('ARG', 0),
+        // restore SP for caller (SP = ARG + 1)
+        '@ARG',
+        'D=M',
+        '@SP',
+        'M=D+1',
+        // restore THAT for caller (THAT = *(endframe - 1))
+        '@ENDFRAME',
+        'A=M-1',
+        'D=M',
+        '@THAT',
+        'M=D',
+        // restore THIS for caller (THIS = *(endframe - 2))
+        '@ENDFRAME',
+        'A=M-1',
+        'A=A-1',
+        'D=M',
+        '@THIS',
+        'M=D',
+        // restore ARG for caller (ARG = *(endframe - 3))
+        '@ENDFRAME',
+        'A=M-1',
+        'A=A-1',
+        'A=A-1',
+        'D=M',
+        '@ARG',
+        'M=D',
+        // restore LCL for caller (LCL = *(endframe - 4))
+        '@ENDFRAME',
+        'A=M-1',
+        'A=A-1',
+        'A=A-1',
+        'A=A-1',
+        'D=M',
+        '@LCL',
+        'M=D',
+        // jump to callers return address
+        '@RETADDR',
+        '0;JMP'
+    ]
 };
 
 function parseInstruction(instruction, fileName) {
     if (instruction.startsWith('function')) {
-        return CodeBlocks.initFunction(instruction);
+        return CodeBlocks.handleFunction(instruction);
+    } else if (instruction.startsWith('call')) {
+        return CodeBlocks.handleCall(instruction);
     } else if (instruction === 'return') {
-        return CodeBlocks.returnFromFunction();
+        return CodeBlocks.handleReturn();
     } else if (instruction.startsWith('label')) {
-        // later: determine if the label is inside a function
         return CodeBlocks.label(instruction.split(' ').pop());
     } else if (instruction.startsWith('goto')) {
-        // later: determine if the label is inside a function
         return CodeBlocks.goto(instruction.split(' ').pop());
     } else if (instruction.startsWith('if-goto')) {
-        // later: determine if the label is inside a function
         return CodeBlocks.ifgoto(instruction.split(' ').pop());
     } else if (Commands.includes(instruction)) {
         if (ComparisonCommands.includes(instruction)) {
@@ -411,7 +488,7 @@ function parseInstruction(instruction, fileName) {
 
                 return CodeBlocks.popPointer(i);
             default:
-                throw new Error('Invalid memory segment');
+                throw new Error(`Invalid instruction - ${instruction}`);
         }
     }
 }
@@ -420,8 +497,10 @@ function removeCommentsAndEmptyLines(input) {
     const result = [];
 
     for (const line of input) {
-        if (!line.startsWith('//') && line.trim() !== '') {
-            result.push(line.trim());
+        const stripped = line.replace(/\/+.*$/gm, '').trim();
+
+        if (stripped.length > 0) {
+            result.push(stripped);
         }
     }
 
