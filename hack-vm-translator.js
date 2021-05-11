@@ -421,6 +421,16 @@ const CodeBlocks = {
         // jump to callers return address
         '@RETADDR',
         '0;JMP'
+    ],
+    boot: () => [
+        '// booting up',
+        // SP = 256
+        '@256',
+        'D=A',
+        '@SP',
+        'M=D',
+        // call Sys.init
+        ...CodeBlocks.handleCall('call Sys.init')
     ]
 };
 
@@ -507,7 +517,7 @@ function removeCommentsAndEmptyLines(input) {
     return result;
 }
 
-function translate(input, fileName) {
+function translateFile(input, fileName) {
     if (!input || input.length === 0) {
         throw new Error('Invalid input');
     }
@@ -517,6 +527,24 @@ function translate(input, fileName) {
 
     for (const line of byteCode) {
         asmCode = [...asmCode, ...parseInstruction(line, fileName), ''];
+    }
+
+    return asmCode;
+}
+
+function translateFiles(files, boot = false) {
+    let asmCode = [];
+
+    for (const file of files) {
+        asmCode = [...asmCode, ...translateFile(file.data, file.name)];
+    }
+
+    if (boot) {
+        asmCode = [
+            ...CodeBlocks.boot(),
+            '',
+            ...asmCode
+        ];
     }
 
     if (comparisonCommandsUsed) {
@@ -579,29 +607,33 @@ async function run() {
     const parsedPath = path.parse(providedPath);
     const stats = statSync(providedPath);
 
-    let outputData, outputFile;
+    let outputData = [], outputFile, isDir = false;
 
     if (parsedPath.ext === '.vm' && !stats.isDirectory()) {
         console.log(`Translating file ${parsedPath.base} into ${parsedPath.name}.asm...`);
         const input = await readFile(providedPath);
-        outputData = translate(input, parsedPath.name);
+        outputData = translateFiles([{ data: input, name: parsedPath.name }]);
         outputFile = parsedPath.name + '.asm';
     } else if (parsedPath.ext === '' && stats.isDirectory() && readdirSync(providedPath).length !== 0 && readdirSync(providedPath).map(f => f.toLowerCase()).includes('main.vm')) {
-        console.log('Translating directory ===> TODO...');
-        // const files = readdirSync(providedPath).map(f => f.toLowerCase());
-        // console.log(files);
+        console.log(`Translating directory into ${parsedPath.base}.asm`);
+        isDir = true;
+        const files = readdirSync(providedPath).filter(f => f.includes('.vm'));
+        const filesToTranslate = [];
 
-        // for (const file of files) {
-        //     const data = await readFile(`${providedPath}/${file}`);
-        //     console.log(data);
-        // }
+        for (const file of files) {
+            const data = await readFile(`${providedPath}/${file}`);
+            filesToTranslate.push({ data, name: file });
+        }
+
+        outputData = translateFiles(filesToTranslate, true);
+        outputFile = parsedPath.base + '.asm';
     } else {
         throw new Error('Invalid path (must be either a file with .vm extension or a directory with Main.vm/main.vm in it)');
     }
 
     if (parsedPath.dir.length > 0) {
         // write file to the same location where it was read from
-        outputFile = `${parsedPath.dir}/${outputFile}`;
+        outputFile = isDir ? `${parsedPath.dir}/${parsedPath.base}/${outputFile}` : `${parsedPath.dir}/${outputFile}`;
     }
 
     writeFile(outputFile, outputData);
