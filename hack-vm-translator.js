@@ -284,7 +284,6 @@ const CodeBlocks = {
     handleCall: (instruction) => {
         const [, functionName, nArgs] = instruction.split(' ');
 
-        // @todo: understand how to handle this from booting
         if (typeof calls[currentFunction] !== 'undefined') {
             calls[currentFunction] += 1;
         } else {
