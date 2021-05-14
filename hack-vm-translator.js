@@ -271,14 +271,14 @@ const CodeBlocks = {
             `// ${instruction}`,
             `(${functionName})`
         ];
-    
+
         if (nVars && parseInt(nVars, 10) !== 0) {
             for (let i = 0; i < parseInt(nVars, 10); i++) {
                 const block = CodeBlocks.pushConstant(0);
                 code = [...code, ...block];
             }
         }
-    
+
         return code;
     },
     handleCall: (instruction) => {
@@ -304,28 +304,28 @@ const CodeBlocks = {
             ...CodeBlocks.incrementStackPointer(),
             // push LCL
             '@LCL',
-            'D=A',
+            'D=M',
             '@SP',
             'A=M',
             'M=D',
             ...CodeBlocks.incrementStackPointer(),
              // push ARG
              '@ARG',
-             'D=A',
+             'D=M',
              '@SP',
              'A=M',
              'M=D',
              ...CodeBlocks.incrementStackPointer(),
               // push THIS
             '@THIS',
-            'D=A',
+            'D=M',
             '@SP',
             'A=M',
             'M=D',
             ...CodeBlocks.incrementStackPointer(),
              // push THAT
              '@THAT',
-             'D=A',
+             'D=M',
              '@SP',
              'A=M',
              'M=D',
@@ -429,8 +429,9 @@ const CodeBlocks = {
         'D=A',
         '@SP',
         'M=D',
-        // call Sys.init
-        ...CodeBlocks.handleCall('call Sys.init')
+        // call Sys.init (initial stack frame is all zeroes)
+        '@Sys.init',
+        '0;JMP'
     ]
 };
 
@@ -614,7 +615,7 @@ async function run() {
         const input = await readFile(providedPath);
         outputData = translateFiles([{ data: input, name: parsedPath.name }]);
         outputFile = parsedPath.name + '.asm';
-    } else if (parsedPath.ext === '' && stats.isDirectory() && readdirSync(providedPath).length !== 0 && readdirSync(providedPath).map(f => f.toLowerCase()).includes('main.vm')) {
+    } else if (parsedPath.ext === '' && stats.isDirectory() && readdirSync(providedPath).length !== 0) {
         console.log(`Translating directory into ${parsedPath.base}.asm`);
         isDir = true;
         const files = readdirSync(providedPath).filter(f => f.includes('.vm'));
@@ -628,7 +629,7 @@ async function run() {
         outputData = translateFiles(filesToTranslate, true);
         outputFile = parsedPath.base + '.asm';
     } else {
-        throw new Error('Invalid path (must be either a file with .vm extension or a directory with Main.vm/main.vm in it)');
+        throw new Error('Invalid path (must be either a file with .vm extension or a directory with *.vm files in it)');
     }
 
     if (parsedPath.dir.length > 0) {
