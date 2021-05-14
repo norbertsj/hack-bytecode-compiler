@@ -423,8 +423,8 @@ const CodeBlocks = {
     ],
     boot: () => [
         '// booting up',
-        // SP = 256
-        '@256',
+        // SP = 256 (setting to 261 to simulate frame save for 'call Sys.init')
+        '@261',
         'D=A',
         '@SP',
         'M=D',
