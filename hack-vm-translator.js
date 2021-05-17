@@ -419,6 +419,7 @@ const CodeBlocks = {
         'M=D',
         // jump to callers return address
         '@RETADDR',
+        'A=M',
         '0;JMP'
     ],
     boot: () => [
