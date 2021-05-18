@@ -1,14 +1,6 @@
 # Hack VM Translator
 
-**TODO**
-
--   support for whole directory (with Main.vm) or single file (remember about Static)
--   label
--   goto
--   if-goto
--   function
--   call
--   return
+This a Virtual Machine implementation on Hack platform. It generates Hack ASM code.
 
 ## Arithmetic/Logic commands
 
