@@ -1,6 +1,6 @@
 # Hack VM Translator
 
-This a Virtual Machine implementation on Hack platform. It generates Hack ASM code.
+This a Virtual Machine implementation on [Hack platform](https://www.nand2tetris.org). It generates Hack ASM code.
 
 ## Arithmetic/Logic commands
 
