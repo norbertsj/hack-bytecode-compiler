@@ -10,31 +10,17 @@ const SegmentCodes = {
     argument: 'ARG',
     this: 'THIS',
     that: 'THAT',
-    temp: 5
+    temp: 5,
 };
 
 const Pointers = {
-    '0': 'THIS',
-    '1': 'THAT'
-}
+    0: 'THIS',
+    1: 'THAT',
+};
 
-const Commands = [
-    'add',
-    'sub',
-    'neg',
-    'and',
-    'or',
-    'not',
-    'eq',
-    'lt',
-    'gt'
-];
+const Commands = ['add', 'sub', 'neg', 'and', 'or', 'not', 'eq', 'lt', 'gt'];
 
-const ComparisonCommands = [
-    'eq',
-    'lt',
-    'gt'
-];
+const ComparisonCommands = ['eq', 'lt', 'gt'];
 
 // indicates if we need to add comparison code blocks at the top of the ASM file
 let comparisonCommandsUsed = false;
@@ -49,46 +35,21 @@ let currentFunction = null;
 const calls = {};
 
 const CodeBlocks = {
-    setAddress: (segment, i) => [
-        `@${i}`,
-        'D=A',
-        `@${segment}`,
-        segment === SegmentCodes.temp ? 'A=D+A' : 'A=D+M'
-    ],
-    fromAddressToStack: () => [
-        'D=M',
-        '@SP',
-        'A=M',
-        'M=D'
-    ],
-    fromStackToAddress: () => [
-        '@R15',
-        'M=D',
-        '@SP',
-        'A=M',
-        'D=M',
-        '@R15',
-        'A=M',
-        'M=D'
-    ],
-    incrementStackPointer: () => [
-        '@SP',
-        'M=M+1'
-    ],
-    decrementStackPointer: () => [
-        '@SP',
-        'M=M-1'
-    ],
+    setAddress: (segment, i) => [`@${i}`, 'D=A', `@${segment}`, segment === SegmentCodes.temp ? 'A=D+A' : 'A=D+M'],
+    fromAddressToStack: () => ['D=M', '@SP', 'A=M', 'M=D'],
+    fromStackToAddress: () => ['@R15', 'M=D', '@SP', 'A=M', 'D=M', '@R15', 'A=M', 'M=D'],
+    incrementStackPointer: () => ['@SP', 'M=M+1'],
+    decrementStackPointer: () => ['@SP', 'M=M-1'],
     pushSegment: (segment, i) => [
         ...CodeBlocks.setAddress(segment, i),
         ...CodeBlocks.fromAddressToStack(),
-        ...CodeBlocks.incrementStackPointer()
+        ...CodeBlocks.incrementStackPointer(),
     ],
     popSegment: (segment, i) => [
         ...CodeBlocks.setAddress(segment, i),
         'D=A',
         ...CodeBlocks.decrementStackPointer(),
-        ...CodeBlocks.fromStackToAddress()
+        ...CodeBlocks.fromStackToAddress(),
     ],
     pushConstant: (constant) => [
         `// push constant ${constant}`,
@@ -97,7 +58,7 @@ const CodeBlocks = {
         '@SP',
         'A=M',
         'M=D',
-        ...CodeBlocks.incrementStackPointer()
+        ...CodeBlocks.incrementStackPointer(),
     ],
     pushPointer: (pointer) => [
         `// push pointer ${pointer}`,
@@ -106,7 +67,7 @@ const CodeBlocks = {
         '@SP',
         'A=M',
         'M=D',
-        ...CodeBlocks.incrementStackPointer()
+        ...CodeBlocks.incrementStackPointer(),
     ],
     popPointer: (pointer) => [
         `// pop pointer ${pointer}`,
@@ -114,20 +75,20 @@ const CodeBlocks = {
         'A=M',
         'D=M',
         `@${Pointers[pointer]}`,
-        'M=D'
+        'M=D',
     ],
     pushStatic: (fileName, i) => [
         `// push static ${i}`,
         `@${fileName}.${i}`,
         ...CodeBlocks.fromAddressToStack(),
-        ...CodeBlocks.incrementStackPointer()
+        ...CodeBlocks.incrementStackPointer(),
     ],
     popStatic: (fileName, i) => [
         `// pop static ${i}`,
         `@${fileName}.${i}`,
         'D=A',
         ...CodeBlocks.decrementStackPointer(),
-        ...CodeBlocks.fromStackToAddress()
+        ...CodeBlocks.fromStackToAddress(),
     ],
     setXY: () => [
         ...CodeBlocks.decrementStackPointer(),
@@ -139,138 +100,60 @@ const CodeBlocks = {
         'A=M',
         'D=M',
     ],
-    pushResultToStack: () => [
-        '@SP',
-        'A=M',
-        'M=D',
-        ...CodeBlocks.incrementStackPointer()
-    ],
-    add: () => [
-        '// add',
-        ...CodeBlocks.setXY(),
-        '@R15',
-        'D=D+M',
-        ...CodeBlocks.pushResultToStack()
-    ],
-    sub: () => [
-        '// sub',
-        ...CodeBlocks.setXY(),
-        '@R15',
-        'D=D-M',
-        ...CodeBlocks.pushResultToStack()
-    ],
-    neg: () => [
-        '// neg',
-        ...CodeBlocks.decrementStackPointer(),
-        'A=M',
-        'D=-M',
-        ...CodeBlocks.pushResultToStack()
-    ],
-    and: () => [
-        '// and',
-        ...CodeBlocks.setXY(),
-        '@R15',
-        'D=D&M',
-        ...CodeBlocks.pushResultToStack()
-    ],
-    or: () => [
-        '// or',
-        ...CodeBlocks.setXY(),
-        '@R15',
-        'D=D|M',
-        ...CodeBlocks.pushResultToStack()
-    ],
-    not: () => [
-        '// not',
-        ...CodeBlocks.decrementStackPointer(),
-        'A=M',
-        'D=!M',
-        ...CodeBlocks.pushResultToStack()
-    ],
+    pushResultToStack: () => ['@SP', 'A=M', 'M=D', ...CodeBlocks.incrementStackPointer()],
+    add: () => ['// add', ...CodeBlocks.setXY(), '@R15', 'D=D+M', ...CodeBlocks.pushResultToStack()],
+    sub: () => ['// sub', ...CodeBlocks.setXY(), '@R15', 'D=D-M', ...CodeBlocks.pushResultToStack()],
+    neg: () => ['// neg', ...CodeBlocks.decrementStackPointer(), 'A=M', 'D=-M', ...CodeBlocks.pushResultToStack()],
+    and: () => ['// and', ...CodeBlocks.setXY(), '@R15', 'D=D&M', ...CodeBlocks.pushResultToStack()],
+    or: () => ['// or', ...CodeBlocks.setXY(), '@R15', 'D=D|M', ...CodeBlocks.pushResultToStack()],
+    not: () => ['// not', ...CodeBlocks.decrementStackPointer(), 'A=M', 'D=!M', ...CodeBlocks.pushResultToStack()],
     true: () => [
         '(TRUE)',
         '    @SP',
         '    A=M',
         '    M=-1',
-        ...CodeBlocks.incrementStackPointer().map(i => `    ${i}`),
+        ...CodeBlocks.incrementStackPointer().map((i) => `    ${i}`),
         '    @R13',
         '    A=M',
-        '    0;JMP'
+        '    0;JMP',
     ],
     false: () => [
         '(FALSE)',
         '    @SP',
         '    A=M',
         '    M=0',
-        ...CodeBlocks.incrementStackPointer().map(i => `    ${i}`),
+        ...CodeBlocks.incrementStackPointer().map((i) => `    ${i}`),
         '    @R13',
         '    A=M',
-        '    0;JMP'
+        '    0;JMP',
     ],
     compare: (jump, label) => [
         `(${label})`,
-        ...CodeBlocks.setXY().map(i => `    ${i}`),
+        ...CodeBlocks.setXY().map((i) => `    ${i}`),
         '    @R15',
         '    D=D-M',
         '    @TRUE',
         `    D;${jump}`,
         '    @FALSE',
-        '    0;JMP'
+        '    0;JMP',
     ],
-    eq: (n) => [
-        '// eq',
-        `@EQ.${n}.END`,
-        'D=A',
-        '@R13',
-        'M=D',
-        '@EQ',
-        '0;JMP',
-        `(EQ.${n}.END)`
-    ],
-    lt: (n) => [
-        '// lt',
-        `@LT.${n}.END`,
-        'D=A',
-        '@R13',
-        'M=D',
-        '@LT',
-        '0;JMP',
-        `(LT.${n}.END)`
-    ],
-    gt: (n) => [
-        '// gt',
-        `@GT.${n}.END`,
-        'D=A',
-        '@R13',
-        'M=D',
-        '@GT',
-        '0;JMP',
-        `(GT.${n}.END)`
-    ],
-    label: (name) => [
-        `// label ${name}`,
-        `(${currentFunction ? currentFunction + '$' + name : name})`
-    ],
-    goto: (label) => [
-        `// goto ${label}`,
-        `@${currentFunction ? currentFunction + '$' + label : label}`,
-        '0;JMP'
-    ],
+    eq: (n) => ['// eq', `@EQ.${n}.END`, 'D=A', '@R13', 'M=D', '@EQ', '0;JMP', `(EQ.${n}.END)`],
+    lt: (n) => ['// lt', `@LT.${n}.END`, 'D=A', '@R13', 'M=D', '@LT', '0;JMP', `(LT.${n}.END)`],
+    gt: (n) => ['// gt', `@GT.${n}.END`, 'D=A', '@R13', 'M=D', '@GT', '0;JMP', `(GT.${n}.END)`],
+    label: (name) => [`// label ${name}`, `(${currentFunction ? currentFunction + '$' + name : name})`],
+    goto: (label) => [`// goto ${label}`, `@${currentFunction ? currentFunction + '$' + label : label}`, '0;JMP'],
     ifgoto: (label) => [
         `// if-goto ${label}`,
         ...CodeBlocks.decrementStackPointer(),
         'A=M',
         'D=M',
         `@${currentFunction ? currentFunction + '$' + label : label}`,
-        'D;JNE' // if D !== 0 (true) => jump
+        'D;JNE', // if D !== 0 (true) => jump
     ],
     handleFunction: (instruction) => {
         const [, functionName, nVars] = instruction.split(' ');
         currentFunction = functionName;
-        let code = [
-            `// ${instruction}`,
-            `(${functionName})`
-        ];
+        let code = [`// ${instruction}`, `(${functionName})`];
 
         if (nVars && parseInt(nVars, 10) !== 0) {
             for (let i = 0; i < parseInt(nVars, 10); i++) {
@@ -308,34 +191,34 @@ const CodeBlocks = {
             'A=M',
             'M=D',
             ...CodeBlocks.incrementStackPointer(),
-             // push ARG
-             '@ARG',
-             'D=M',
-             '@SP',
-             'A=M',
-             'M=D',
-             ...CodeBlocks.incrementStackPointer(),
-              // push THIS
+            // push ARG
+            '@ARG',
+            'D=M',
+            '@SP',
+            'A=M',
+            'M=D',
+            ...CodeBlocks.incrementStackPointer(),
+            // push THIS
             '@THIS',
             'D=M',
             '@SP',
             'A=M',
             'M=D',
             ...CodeBlocks.incrementStackPointer(),
-             // push THAT
-             '@THAT',
-             'D=M',
-             '@SP',
-             'A=M',
-             'M=D',
-             ...CodeBlocks.incrementStackPointer(),
-             // set ARG for callee (part 1)
-             '@SP',
-             'D=M-1',
-             'D=D-1',
-             'D=D-1',
-             'D=D-1',
-             'D=D-1',
+            // push THAT
+            '@THAT',
+            'D=M',
+            '@SP',
+            'A=M',
+            'M=D',
+            ...CodeBlocks.incrementStackPointer(),
+            // set ARG for callee (part 1)
+            '@SP',
+            'D=M-1',
+            'D=D-1',
+            'D=D-1',
+            'D=D-1',
+            'D=D-1',
         ];
 
         // set ARG for callee (part 2)
@@ -358,7 +241,7 @@ const CodeBlocks = {
             `@${functionName}`,
             '0;JMP',
             // (returnAddressLabel)
-            `(${returnAddressLabel})`
+            `(${returnAddressLabel})`,
         ];
 
         return code;
@@ -420,7 +303,7 @@ const CodeBlocks = {
         // jump to callers return address
         '@RETADDR',
         'A=M',
-        '0;JMP'
+        '0;JMP',
     ],
     boot: () => [
         '// booting up',
@@ -431,8 +314,8 @@ const CodeBlocks = {
         'M=D',
         // call Sys.init (initial stack frame is all zeroes)
         '@Sys.init',
-        '0;JMP'
-    ]
+        '0;JMP',
+    ],
 };
 
 function parseInstruction(instruction, fileName) {
@@ -518,7 +401,7 @@ function removeCommentsAndEmptyLines(input) {
     return result;
 }
 
-function translateFile(input, fileName) {
+function compileFile(input, fileName) {
     if (!input || input.length === 0) {
         throw new Error('Invalid input');
     }
@@ -533,19 +416,15 @@ function translateFile(input, fileName) {
     return asmCode;
 }
 
-function translateFiles(files, boot = false) {
+function compileFiles(files, boot = false) {
     let asmCode = [];
 
     for (const file of files) {
-        asmCode = [...asmCode, ...translateFile(file.data, file.name)];
+        asmCode = [...asmCode, ...compileFile(file.data, file.name)];
     }
 
     if (boot) {
-        asmCode = [
-            ...CodeBlocks.boot(),
-            '',
-            ...asmCode
-        ];
+        asmCode = [...CodeBlocks.boot(), '', ...asmCode];
     }
 
     if (comparisonCommandsUsed) {
@@ -565,7 +444,7 @@ function translateFiles(files, boot = false) {
             '',
             '(START)',
             '',
-            ...asmCode
+            ...asmCode,
         ];
     }
 
@@ -586,7 +465,7 @@ function readFile(filePath) {
 
         const rl = createInterface({
             input: createReadStream(filePath),
-            crlfDelay: Infinity
+            crlfDelay: Infinity,
         });
 
         rl.on('line', (line) => data.push(line));
@@ -608,17 +487,19 @@ async function run() {
     const parsedPath = path.parse(providedPath);
     const stats = statSync(providedPath);
 
-    let outputData = [], outputFile, isDir = false;
+    let outputData = [],
+        outputFile,
+        isDir = false;
 
     if (parsedPath.ext === '.vm' && !stats.isDirectory()) {
-        console.log(`Translating file ${parsedPath.base} into ${parsedPath.name}.asm...`);
+        console.log(`Compiling file ${parsedPath.base} into ${parsedPath.name}.asm...`);
         const input = await readFile(providedPath);
-        outputData = translateFiles([{ data: input, name: parsedPath.name }]);
+        outputData = compileFiles([{ data: input, name: parsedPath.name }]);
         outputFile = parsedPath.name + '.asm';
     } else if (parsedPath.ext === '' && stats.isDirectory() && readdirSync(providedPath).length !== 0) {
-        console.log(`Translating directory into ${parsedPath.base}.asm`);
+        console.log(`Compiling directory into ${parsedPath.base}.asm`);
         isDir = true;
-        const files = readdirSync(providedPath).filter(f => f.includes('.vm'));
+        const files = readdirSync(providedPath).filter((f) => f.includes('.vm'));
         const filesToTranslate = [];
 
         for (const file of files) {
@@ -626,7 +507,7 @@ async function run() {
             filesToTranslate.push({ data, name: file });
         }
 
-        outputData = translateFiles(filesToTranslate, true);
+        outputData = compileFiles(filesToTranslate, true);
         outputFile = parsedPath.base + '.asm';
     } else {
         throw new Error('Invalid path (must be either a file with .vm extension or a directory with *.vm files in it)');

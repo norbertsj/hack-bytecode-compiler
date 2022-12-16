@@ -1,6 +1,6 @@
-# Hack VM Translator
+# Hack bytecode compiler
 
-This a Virtual Machine implementation on [Hack platform](https://www.nand2tetris.org). It generates Hack ASM code.
+Compiles Hack bytecode into [Hack](https://www.nand2tetris.org) assembly.
 
 ## Arithmetic/Logic commands
 
